@@ -1,6 +1,5 @@
 const qs = require('querystring')
 const makeFetch = require('make-fetch-happen')
-const cheerio = require('cheerio')
 const pkg = require('../package.json')
 
 const HINT_LENGTH = 200 // characters
@@ -49,19 +48,21 @@ const WikiPage = class WikiPage {
    * Extract a short hint text from the article content.
    */
 
-  getHint () {
-    try {
-      const hint = cheerio('.mw-parser-output > p', this.content)
-        .filter((i, el) => cheerio(el).text().trim() !== '')
-        .first()
-        .text()
-        .replace(/\[\d+]/gm, '')
-      return hint.length > HINT_LENGTH
-        ? `${hint.substr(0, HINT_LENGTH)}…`
-        : hint
-    } catch (e) {
-      return `(Could not load hint: [${e.message}])`
-    }
+  async getHint () {
+    const query = qs.stringify({
+      action: 'query',
+      format: 'json',
+      prop: 'extracts',
+      titles: this.title,
+      exchars: HINT_LENGTH.toString(),
+      explaintext: true
+    })
+
+    const response = await fetch(`https://en.wikipedia.org/w/api.php?${query}`)
+    const body = await response.json()
+    const hint = Object.values(body.query.pages)[0].extract
+    return hint
+      .replace(/\[((Note )?\d+|\w)]/gmi, '')
   }
 
   /**
